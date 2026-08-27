@@ -46,30 +46,26 @@ func (h *OwnerHandler) HandleMessage(c telebot.Context) error {
 		return nil
 	}
 
-	h.logger.Printf("[INFO] "Received message from owner",
-		"topic_id", topicID,
-		"message_id", message.ID,
-		"content_type", getContentType(message),
-	)
+	h.logger.Printf("[INFO] Received message from owner: topic_id=%d message_id=%d content_type=%s",
+		topicID, message.ID, getContentType(message))
 
 	// Find the client for this topic
 	chat, err := h.db.GetChatByTopicID(topicID)
 	if err != nil || chat == nil {
-		h.logger.Printf("[ERROR] "No chat found for topic"" topic_id=%d", topicID" error=%v", err)
+		h.logger.Printf("[ERROR] No chat found for topic: topic_id=%d error=%v", topicID, err)
 		return nil
 	}
 
 	if chat.Blocked {
-		h.logger.Printf("[WARN] "Trying to send to blocked user"" user_id=%d", chat.UserID)
-		_, _ = c.Send(h.config.BlockedMessage)
+		h.logger.Printf("[WARN] Trying to send to blocked user: user_id=%d", chat.UserID)
 		return nil
 	}
 
 	// Copy message to the client
-	clientChat := &telebot.ChatID{ID: chat.UserID}
-	copiedMsg, err := h.tgClient.Copy(clientChat, h.config.SuperGroupID, message.ID)
+	clientChat := &telebot.Chat{ID: chat.UserID}
+	copiedMsg, err := h.tgClient.CopyMessageToUser(clientChat, message)
 	if err != nil {
-		h.logger.Printf("[ERROR] "Failed to copy message to client"" user_id=%d", chat.UserID" error=%v", err)
+		h.logger.Printf("[ERROR] Failed to copy message to client: user_id=%d error=%v", chat.UserID, err)
 		return nil
 	}
 
@@ -108,39 +104,35 @@ func (h *OwnerHandler) HandleEditedMessage(c telebot.Context) error {
 		return nil
 	}
 
-	h.logger.Printf("[INFO] "Received edited message from owner",
-		"topic_id", topicID,
-		"message_id", message.ID,
-	)
+	h.logger.Printf("[INFO] Received edited message from owner: topic_id=%d message_id=%d",
+		topicID, message.ID)
 
 	// Find the message link
 	link, err := h.db.GetMessageLinkByGroupMessage(topicID, int64(message.ID))
 	if err != nil || link == nil {
-		h.logger.Printf("[WARN] "No message link found for edited message"" topic_id=%d", topicID" message_id=%d", message.ID)
+		h.logger.Printf("[WARN] No message link found for edited message: topic_id=%d message_id=%d", topicID, message.ID)
 		return nil
 	}
 
 	// Edit the corresponding message on the client side
-	clientChat := &telebot.ChatID{ID: link.UserID}
+	clientChat := &telebot.Chat{ID: link.UserID}
 
 	if message.Text != "" {
 		err = h.tgClient.EditMessageText(clientChat, int(link.ClientMessageID), message.Text)
 	} else if message.Caption != "" {
 		err = h.tgClient.EditMessageCaption(clientChat, int(link.ClientMessageID), message.Caption)
 	} else {
-		h.logger.Printf("[INFO] "Cannot edit media content, only captions"" topic_id=%d", topicID)
+		h.logger.Printf("[INFO] Cannot edit media content, only captions: topic_id=%d", topicID)
 		return nil
 	}
 
 	if err != nil {
-		h.logger.Printf("[ERROR] "Failed to edit message on client side", "user_id", link.UserID" error=%v", err)
+		h.logger.Printf("[ERROR] Failed to edit message on client side: user_id=%d error=%v", link.UserID, err)
 		return nil
 	}
 
-	h.logger.Printf("[INFO] "Message edited on client side",
-		"user_id", link.UserID,
-		"client_message_id", link.ClientMessageID,
-	)
+	h.logger.Printf("[INFO] Message edited on client side: user_id=%d client_message_id=%d",
+		link.UserID, link.ClientMessageID)
 
 	return nil
 }

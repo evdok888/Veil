@@ -48,7 +48,7 @@ func (h *CommandHandler) HandleCommand(c telebot.Context) error {
 	parts := strings.Fields(text)
 	command := strings.TrimPrefix(parts[0], "/")
 
-	h.logger.Printf("[INFO] "Received command"" command=%s", command" sender_id=%d", message.Sender.ID)
+	h.logger.Printf("[INFO] Received command: command=%s sender_id=%d", command, message.Sender.ID)
 
 	switch command {
 	case "end", "block":
@@ -69,7 +69,7 @@ func (h *CommandHandler) HandleCallback(c telebot.Context) error {
 	callback := c.Callback()
 	action, targetID := ExtractCallbackData(callback.Data)
 
-	h.logger.Printf("[INFO] "Received callback", "action", action, "target_id", targetID)
+	h.logger.Printf("[INFO] Received callback: action=%s target_id=%d", action, targetID)
 
 	// Verify owner
 	if callback.Sender.ID != h.config.OwnerUserID {
@@ -146,7 +146,7 @@ func (h *CommandHandler) handleBlock(c telebot.Context, message *telebot.Message
 		_ = h.tgClient.CloseTopic(h.config.SuperGroupID, chat.TopicID)
 	}
 
-	h.logger.Printf("[INFO] "User blocked"" user_id=%d", userID)
+	h.logger.Printf("[INFO] User blocked: user_id=%d", userID)
 	_, _ = c.Send(fmt.Sprintf("✅ Пользователь %d заблокирован. Диалог завершён.", userID))
 
 	return nil
@@ -184,7 +184,7 @@ func (h *CommandHandler) handleUnblock(c telebot.Context, message *telebot.Messa
 		_ = h.tgClient.ReopenTopic(h.config.SuperGroupID, chat.TopicID)
 	}
 
-	h.logger.Printf("[INFO] "User unblocked"" user_id=%d", userID)
+	h.logger.Printf("[INFO] User unblocked: user_id=%d", userID)
 	_, _ = c.Send(fmt.Sprintf("✅ Пользователь %d разблокирован.", userID))
 
 	return nil

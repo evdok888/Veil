@@ -104,12 +104,8 @@ func (h *ClientHandler) HandleMessage(c telebot.Context) error {
 		return nil
 	}
 
-	copiedMsg, err := h.tgClient.CopyMessageToTopic(
-		h.config.SuperGroupID,
-		topicID,
-		message.Chat.ID,
-		message.ID,
-	)
+	supergroupChat := &telebot.Chat{ID: h.config.SuperGroupID}
+	copiedMsg, err := h.tgClient.CopyMessageToTopic(supergroupChat, topicID, message)
 	if err != nil {
 		h.logger.Printf("[ERROR] Failed to copy message to group: user_id=%d error=%v", userID, err)
 		return nil

@@ -21,21 +21,20 @@ func NewClient(token string, settings telebot.Settings) (*Client, error) {
 	return &Client{Bot: bot}, nil
 }
 
-// CopyMessageToTopic copies a message to a specific topic in a supergroup
-func (c *Client) CopyMessageToTopic(chatID int64, topicID int64, fromChatID int64, messageID int) (*telebot.Message, error) {
-	dst := &telebot.Chat{ID: chatID}
-	opts := &telebot.SendOptions{MessageThreadID: int(topicID)}
-	msg, err := c.Copy(dst, fromChatID, messageID, opts)
+// CopyMessageToTopic copies a message from a client to a topic in the supergroup
+// Uses bot.Copy with the incoming message as Editable
+func (c *Client) CopyMessageToTopic(supergroupChat *telebot.Chat, topicID int64, incomingMsg *telebot.Message) (*telebot.Message, error) {
+	msg, err := c.Copy(supergroupChat, incomingMsg, &telebot.SendOptions{ThreadID: int(topicID)})
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy message: %w", err)
 	}
 	return msg, nil
 }
 
-// CopyMessageToUser copies a message from a group topic to a user
-func (c *Client) CopyMessageToUser(userID int64, fromChatID int64, messageID int) (*telebot.Message, error) {
-	dst := &telebot.Chat{ID: userID}
-	msg, err := c.Copy(dst, fromChatID, messageID, nil)
+// CopyMessageToUser copies a message from the owner in a topic to a client
+// Uses bot.Copy with the incoming message as Editable
+func (c *Client) CopyMessageToUser(clientChat *telebot.Chat, incomingMsg *telebot.Message) (*telebot.Message, error) {
+	msg, err := c.Copy(clientChat, incomingMsg, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy message: %w", err)
 	}
@@ -45,17 +44,19 @@ func (c *Client) CopyMessageToUser(userID int64, fromChatID int64, messageID int
 // CreateTopic creates a new topic in a supergroup
 func (c *Client) CreateTopic(chatID int64, name string) (int64, error) {
 	chat := &telebot.Chat{ID: chatID}
-	topicID, err := c.CreateTopic(chat, name)
+	topic := &telebot.Topic{Name: name}
+	result, err := c.Bot.CreateTopic(chat, topic)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create topic: %w", err)
 	}
-	return int64(topicID), nil
+	return int64(result.ThreadID), nil
 }
 
 // CloseTopic closes a topic in a supergroup
 func (c *Client) CloseTopic(chatID int64, topicID int64) error {
 	chat := &telebot.Chat{ID: chatID}
-	err := c.CloseTopic(chat, int(topicID))
+	topic := &telebot.Topic{ThreadID: int(topicID)}
+	err := c.Bot.CloseTopic(chat, topic)
 	if err != nil {
 		return fmt.Errorf("failed to close topic: %w", err)
 	}
@@ -65,7 +66,8 @@ func (c *Client) CloseTopic(chatID int64, topicID int64) error {
 // ReopenTopic reopens a closed topic
 func (c *Client) ReopenTopic(chatID int64, topicID int64) error {
 	chat := &telebot.Chat{ID: chatID}
-	err := c.ReopenTopic(chat, int(topicID))
+	topic := &telebot.Topic{ThreadID: int(topicID)}
+	err := c.Bot.ReopenTopic(chat, topic)
 	if err != nil {
 		return fmt.Errorf("failed to reopen topic: %w", err)
 	}
@@ -75,7 +77,8 @@ func (c *Client) ReopenTopic(chatID int64, topicID int64) error {
 // DeleteTopic deletes a topic from a supergroup
 func (c *Client) DeleteTopic(chatID int64, topicID int64) error {
 	chat := &telebot.Chat{ID: chatID}
-	err := c.DeleteTopic(chat, int(topicID))
+	topic := &telebot.Topic{ThreadID: int(topicID)}
+	err := c.Bot.DeleteTopic(chat, topic)
 	if err != nil {
 		return fmt.Errorf("failed to delete topic: %w", err)
 	}
@@ -84,7 +87,8 @@ func (c *Client) DeleteTopic(chatID int64, topicID int64) error {
 
 // EditMessageText edits a text message
 func (c *Client) EditMessageText(chat *telebot.Chat, messageID int, text string) error {
-	_, err := c.Edit(chat, messageID, text)
+	msg := &telebot.Message{Chat: chat, ID: messageID}
+	_, err := c.Bot.Edit(msg, text)
 	if err != nil {
 		return fmt.Errorf("failed to edit message text: %w", err)
 	}
@@ -93,32 +97,8 @@ func (c *Client) EditMessageText(chat *telebot.Chat, messageID int, text string)
 
 // EditMessageCaption edits a message caption (for media)
 func (c *Client) EditMessageCaption(chat *telebot.Chat, messageID int, caption string) error {
-	msg, err := c.GetMessage(*chat, messageID)
-	if err != nil {
-		return fmt.Errorf("failed to get message for caption edit: %w", err)
-	}
-
-	editable := &telebot.Message{
-		Chat:    *chat,
-		ID:      messageID,
-		Caption: caption,
-	}
-
-	if msg.Photo != nil && len(msg.Photo) > 0 {
-		editable.Photo = msg.Photo[0]
-	} else if msg.Video != nil {
-		editable.Video = msg.Video
-	} else if msg.Audio != nil {
-		editable.Audio = msg.Audio
-	} else if msg.Document != nil {
-		editable.Document = msg.Document
-	} else if msg.Voice != nil {
-		editable.Voice = msg.Voice
-	} else if msg.Animation != nil {
-		editable.Animation = msg.Animation
-	}
-
-	_, err = c.Edit(editable, editable.Caption)
+	msg := &telebot.Message{Chat: chat, ID: messageID, Caption: caption}
+	_, err := c.Bot.Edit(msg, msg.Caption)
 	if err != nil {
 		return fmt.Errorf("failed to edit message caption: %w", err)
 	}
@@ -127,7 +107,8 @@ func (c *Client) EditMessageCaption(chat *telebot.Chat, messageID int, caption s
 
 // DeleteMessage deletes a message
 func (c *Client) DeleteMessage(chat *telebot.Chat, messageID int) error {
-	err := c.Delete(*chat, messageID)
+	msg := &telebot.Message{Chat: chat, ID: messageID}
+	err := c.Bot.Delete(msg)
 	if err != nil {
 		return fmt.Errorf("failed to delete message: %w", err)
 	}
