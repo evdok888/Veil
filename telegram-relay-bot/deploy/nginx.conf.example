@@ -1,0 +1,70 @@
+# Nginx configuration example for Telegram Relay Bot webhook
+# This config proxies HTTPS webhook requests to the local bot server
+
+server {
+    listen 80;
+    server_name your-domain.com;  # Replace with your actual domain
+
+    # Redirect HTTP to HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;  # Replace with your actual domain
+
+    # SSL certificates (obtained via Let's Encrypt / certbot)
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+
+    # SSL settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Webhook endpoint for Telegram bot
+    location /webhook {
+        # Only allow Telegram's IP addresses (optional but recommended)
+        # See: https://core.telegram.org/bots/webhooks#testing-your-bot-with-updates-generated-by-the-button-my-test-server
+        # allow 149.154.160.0/20;
+        # allow 91.108.4.0/22;
+        # deny all;
+
+        proxy_pass http://127.0.0.1:8443;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Increase timeouts for long polling fallback
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        # For webhook, we need to handle the POST request properly
+        client_max_body_size 20M;  # Allow large file uploads
+    }
+
+    # Optional: Health check endpoint
+    location /health {
+        proxy_pass http://127.0.0.1:8443/health;
+        access_log off;
+    }
+
+    # Deny access to everything else
+    location / {
+        return 404;
+    }
+
+    # Logging
+    access_log /var/log/nginx/telegram-relay-bot-access.log;
+    error_log /var/log/nginx/telegram-relay-bot-error.log warn;
+}

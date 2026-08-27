@@ -1,0 +1,179 @@
+package handlers
+
+import (
+	"fmt"
+	"log"
+	"strings"
+
+	"gopkg.in/telebot.v3"
+
+	"telegram-relay-bot/internal/config"
+	"telegram-relay-bot/internal/db"
+	"telegram-relay-bot/internal/telegram"
+)
+
+// OwnerHandler handles messages from the owner in the supergroup
+type OwnerHandler struct {
+	db       *db.DB
+	tgClient *telegram.Client
+	config   *config.Config
+	logger   *log.Logger
+}
+
+// NewOwnerHandler creates a new owner message handler
+func NewOwnerHandler(db *db.DB, tgClient *telegram.Client, cfg *config.Config, logger *log.Logger) *OwnerHandler {
+	return &OwnerHandler{
+		db:       db,
+		tgClient: tgClient,
+		config:   cfg,
+		logger:   logger,
+	}
+}
+
+// HandleMessage processes messages from the owner in topics
+func (h *OwnerHandler) HandleMessage(c telebot.Context) error {
+	message := c.Message()
+
+	// Verify this is from the owner in the supergroup
+	if !h.isValidOwnerMessage(c) {
+		return nil
+	}
+
+	// Get topic ID from message thread
+	topicID := int64(message.ReplyTo.Topic.ID)
+	if topicID == 0 {
+		// Message not in a topic, ignore
+		return nil
+	}
+
+	h.logger.Printf("[INFO] "Received message from owner",
+		"topic_id", topicID,
+		"message_id", message.ID,
+		"content_type", getContentType(message),
+	)
+
+	// Find the client for this topic
+	chat, err := h.db.GetChatByTopicID(topicID)
+	if err != nil || chat == nil {
+		h.logger.Printf("[ERROR] "No chat found for topic"" topic_id=%d", topicID" error=%v", err)
+		return nil
+	}
+
+	if chat.Blocked {
+		h.logger.Printf("[WARN] "Trying to send to blocked user"" user_id=%d", chat.UserID)
+		_, _ = c.Send(h.config.BlockedMessage)
+		return nil
+	}
+
+	// Copy message to the client
+	clientChat := &telebot.ChatID{ID: chat.UserID}
+	copiedMsg, err := h.tgClient.Copy(clientChat, h.config.SuperGroupID, message.ID)
+	if err != nil {
+		h.logger.Printf("[ERROR] "Failed to copy message to client"" user_id=%d", chat.UserID" error=%v", err)
+		return nil
+	}
+
+	// Save message link
+	err = h.db.CreateMessageLink(
+		chat.UserID,
+		int64(copiedMsg.ID),
+		int64(message.ID),
+		topicID,
+		"owner_to_client",
+	)
+	if err != nil {
+		h.logger.Printf("[ERROR] "Failed to save message link"" user_id=%d", chat.UserID" error=%v", err)
+	}
+
+	h.logger.Printf("[INFO] "Message copied to client",
+		"user_id", chat.UserID,
+		"client_message_id", copiedMsg.ID,
+	)
+
+	return nil
+}
+
+// HandleEditedMessage processes edited messages from the owner
+func (h *OwnerHandler) HandleEditedMessage(c telebot.Context) error {
+	message := c.Message()
+
+	// Verify this is from the owner in the supergroup
+	if !h.isValidOwnerMessage(c) {
+		return nil
+	}
+
+	// Get topic ID from message thread
+	topicID := int64(message.ReplyTo.Topic.ID)
+	if topicID == 0 {
+		return nil
+	}
+
+	h.logger.Printf("[INFO] "Received edited message from owner",
+		"topic_id", topicID,
+		"message_id", message.ID,
+	)
+
+	// Find the message link
+	link, err := h.db.GetMessageLinkByGroupMessage(topicID, int64(message.ID))
+	if err != nil || link == nil {
+		h.logger.Printf("[WARN] "No message link found for edited message"" topic_id=%d", topicID" message_id=%d", message.ID)
+		return nil
+	}
+
+	// Edit the corresponding message on the client side
+	clientChat := &telebot.ChatID{ID: link.UserID}
+
+	if message.Text != "" {
+		err = h.tgClient.EditMessageText(clientChat, int(link.ClientMessageID), message.Text)
+	} else if message.Caption != "" {
+		err = h.tgClient.EditMessageCaption(clientChat, int(link.ClientMessageID), message.Caption)
+	} else {
+		h.logger.Printf("[INFO] "Cannot edit media content, only captions"" topic_id=%d", topicID)
+		return nil
+	}
+
+	if err != nil {
+		h.logger.Printf("[ERROR] "Failed to edit message on client side", "user_id", link.UserID" error=%v", err)
+		return nil
+	}
+
+	h.logger.Printf("[INFO] "Message edited on client side",
+		"user_id", link.UserID,
+		"client_message_id", link.ClientMessageID,
+	)
+
+	return nil
+}
+
+func (h *OwnerHandler) isValidOwnerMessage(c telebot.Context) bool {
+	message := c.Message()
+
+	// Check if message is from the supergroup
+	if message.Chat.ID != h.config.SuperGroupID {
+		return false
+	}
+
+	// Check if message is from the owner
+	if message.Sender.ID != h.config.OwnerUserID {
+		h.logger.Printf("[WARN] "Message from non-owner in supergroup",
+			"sender_id", message.Sender.ID,
+			"expected_owner", h.config.OwnerUserID,
+		)
+		return false
+	}
+
+	return true
+}
+
+// Helper to extract inline query data for callback handling
+func ExtractCallbackData(callback string) (action string, targetID int64) {
+	parts := strings.SplitN(callback, ":", 2)
+	if len(parts) < 1 {
+		return "", 0
+	}
+	action = parts[0]
+	if len(parts) > 1 {
+		fmt.Sscanf(parts[1], "%d", &targetID)
+	}
+	return action, targetID
+}

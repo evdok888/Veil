@@ -1,0 +1,27 @@
+[Unit]
+Description=Telegram Relay Bot
+After=network.target
+
+[Service]
+Type=simple
+User=botuser
+Group=botuser
+WorkingDirectory=/opt/telegram-relay-bot
+ExecStart=/opt/telegram-relay-bot/bot
+Restart=on-failure
+RestartSec=10
+Environment="PATH=/usr/local/go/bin:/usr/bin:/bin"
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/telegram-relay-bot
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-relay-bot
+
+[Install]
+WantedBy=multi-user.target
