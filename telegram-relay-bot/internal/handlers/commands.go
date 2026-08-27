@@ -51,8 +51,10 @@ func (h *CommandHandler) HandleCommand(c telebot.Context) error {
 	h.logger.Printf("[INFO] Received command: command=%s sender_id=%d", command, message.Sender.ID)
 
 	switch command {
-	case "end", "block":
+	case "block":
 		return h.handleBlock(c, message)
+	case "end":
+		return h.handleEnd(c, message)
 	case "unblock":
 		return h.handleUnblock(c, message)
 	case "del", "delete":
@@ -147,7 +149,56 @@ func (h *CommandHandler) handleBlock(c telebot.Context, message *telebot.Message
 	}
 
 	h.logger.Printf("[INFO] User blocked: user_id=%d", userID)
-	_ = c.Send(fmt.Sprintf("✅ Пользователь %d заблокирован. Диалог завершён.", userID))
+	_ = c.Send(fmt.Sprintf("✅ Пользователь %d заблокирован.", userID))
+
+	return nil
+}
+
+// handleEnd closes the topic but does NOT block the user permanently
+// If the client writes again, the topic will be reopened
+func (h *CommandHandler) handleEnd(c telebot.Context, message *telebot.Message) error {
+	var userID int64
+	var topicID int64
+
+	// Check if replying to a message in a topic
+	if message.ThreadID != 0 {
+		topicID = int64(message.ThreadID)
+	} else {
+		// Try to parse user ID from command args
+		if len(strings.Fields(message.Text)) > 1 {
+			idStr := strings.Fields(message.Text)[1]
+			var err error
+			userID, err = strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				_ = c.Send("❌ Неверный формат user_id")
+				return nil
+			}
+		}
+	}
+
+	// If we have topic ID, look up user
+	if topicID > 0 {
+		chat, err := h.db.GetChatByTopicID(topicID)
+		if err != nil || chat == nil {
+			_ = c.Send("❌ Тема не найдена в базе данных")
+			return nil
+		}
+		userID = chat.UserID
+	}
+
+	if userID == 0 {
+		_ = c.Send("❌ Укажите user_id или ответьте командой на сообщение в теме")
+		return nil
+	}
+
+	// Just close the topic (do NOT block)
+	chat, _ := h.db.GetChatByUserID(userID)
+	if chat != nil {
+		_ = h.tgClient.CloseTopic(h.config.SuperGroupID, chat.TopicID)
+	}
+
+	h.logger.Printf("[INFO] Dialog ended (topic closed): user_id=%d", userID)
+	_ = c.Send(fmt.Sprintf("✅ Диалог с пользователем %d завершён (тема закрыта).", userID))
 
 	return nil
 }
@@ -330,8 +381,13 @@ func (h *CommandHandler) handleCloseTopic(c telebot.Context, topicID int64) erro
 func (h *CommandHandler) handleHelp(c telebot.Context) error {
 	helpText := `📋 **Команды бота:**
 
-/block или /end - Заблокировать клиента и закрыть тему
+/block <user_id> - Заблокировать клиента навсегда
   (ответьте на сообщение в теме или укажите user_id)
+  Клиент не сможет писать, пока не будет разблокирован
+
+/end <user_id> - Завершить диалог (закрыть тему)
+  (ответьте на сообщение в теме или укажите user_id)
+  Тема закрывается, но если клиент напишет снова — она откроется
 
 /unblock <user_id> - Разблокировать клиента и открыть тему
 
@@ -341,7 +397,7 @@ func (h *CommandHandler) handleHelp(c telebot.Context) error {
 /help - Показать эту справку
 
 **Кнопки под сообщениями:**
-🚫 Завершить диалог - Блокирует клиента
+🚫 Заблокировать - Блокирует клиента навсегда
 🗑 Удалить - Удаляет сообщение с обеих сторон`
 
 	_ = c.Send(helpText, &telebot.SendOptions{
@@ -357,7 +413,7 @@ func (h *CommandHandler) CreateInlineKeyboardForMessage(userID int64, groupMsgID
 		telebot.Row{
 			telebot.Btn{
 				Unique: "block",
-				Text:   "🚫 Завершить диалог",
+				Text:   "🚫 Заблокировать",
 				Data:   fmt.Sprintf("block:%d", userID),
 			},
 		},
