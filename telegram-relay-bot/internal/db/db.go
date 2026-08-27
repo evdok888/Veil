@@ -24,13 +24,13 @@ type Chat struct {
 
 // MessageLink represents a link between client and group messages
 type MessageLink struct {
-	ID                int64
-	UserID            int64
-	ClientMessageID   int64
-	GroupMessageID    int64
-	TopicID           int64
-	Direction         string // "client_to_owner" or "owner_to_client"
-	CreatedAt         time.Time
+	ID              int64
+	UserID          int64
+	ClientMessageID int64
+	GroupMessageID  int64
+	TopicID         int64
+	Direction       string // "client_to_owner" or "owner_to_client"
+	CreatedAt       time.Time
 }
 
 // New creates a new database connection and runs migrations

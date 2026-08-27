@@ -78,13 +78,10 @@ func (h *OwnerHandler) HandleMessage(c telebot.Context) error {
 		"owner_to_client",
 	)
 	if err != nil {
-		h.logger.Printf("[ERROR] "Failed to save message link"" user_id=%d", chat.UserID" error=%v", err)
+		h.logger.Printf("[ERROR] Failed to save message link, user_id=%d, error=%v", chat.UserID, err)
 	}
 
-	h.logger.Printf("[INFO] "Message copied to client",
-		"user_id", chat.UserID,
-		"client_message_id", copiedMsg.ID,
-	)
+	h.logger.Printf("[INFO] Message copied to client, user_id=%d, client_message_id=%d", chat.UserID, copiedMsg.ID)
 
 	return nil
 }
@@ -147,10 +144,7 @@ func (h *OwnerHandler) isValidOwnerMessage(c telebot.Context) bool {
 
 	// Check if message is from the owner
 	if message.Sender.ID != h.config.OwnerUserID {
-		h.logger.Printf("[WARN] "Message from non-owner in supergroup",
-			"sender_id", message.Sender.ID,
-			"expected_owner", h.config.OwnerUserID,
-		)
+		h.logger.Printf("[WARN] Message from non-owner in supergroup, sender_id=%d, expected_owner=%d", message.Sender.ID, h.config.OwnerUserID)
 		return false
 	}
 

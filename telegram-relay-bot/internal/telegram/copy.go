@@ -131,16 +131,16 @@ func IsRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
-	
+
 	errStr := err.Error()
 	if contains(errStr, "rate limit") || contains(errStr, "Too Many Requests") {
 		return true
 	}
-	
+
 	if contains(errStr, "timeout") || contains(errStr, "connection reset") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -148,21 +148,21 @@ func IsRetryableError(err error) bool {
 func RetryWithBackoff(maxRetries int, initialDelay time.Duration, fn func() error) error {
 	var err error
 	delay := initialDelay
-	
+
 	for i := 0; i < maxRetries; i++ {
 		err = fn()
 		if err == nil {
 			return nil
 		}
-		
+
 		if !IsRetryableError(err) {
 			return err
 		}
-		
+
 		time.Sleep(delay)
 		delay *= 2
 	}
-	
+
 	return err
 }
 

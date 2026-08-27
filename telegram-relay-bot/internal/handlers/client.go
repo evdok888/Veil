@@ -141,7 +141,7 @@ func (h *ClientHandler) HandleEditedMessage(c telebot.Context) error {
 		return nil
 	}
 
-	groupChat := &telebot.ChatID{ID: h.config.SuperGroupID}
+	groupChat := &telebot.Chat{ID: h.config.SuperGroupID}
 
 	if message.Text != "" {
 		err = h.tgClient.EditMessageText(groupChat, int(link.GroupMessageID), message.Text)
@@ -223,7 +223,7 @@ func getContentType(msg *telebot.Message) string {
 	switch {
 	case msg.Text != "":
 		return "text"
-	case msg.Photo != nil && len(msg.Photo) > 0:
+	case msg.Photo != nil && msg.Photo != nil:
 		return "photo"
 	case msg.Voice != nil:
 		return "voice"

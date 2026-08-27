@@ -73,8 +73,8 @@ func (h *CommandHandler) HandleCallback(c telebot.Context) error {
 
 	// Verify owner
 	if callback.Sender.ID != h.config.OwnerUserID {
-		h.tgClient.Answer(&telebot.CallbackResponse{
-			CallbackQueryID: callback.ID,
+		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+			CallbackID: callback.ID,
 			Text:            "⛔️ Недоступно",
 			ShowAlert:       true,
 		})
@@ -89,8 +89,8 @@ func (h *CommandHandler) HandleCallback(c telebot.Context) error {
 	case "close_topic":
 		return h.handleCloseTopic(c, targetID)
 	default:
-		h.tgClient.Answer(&telebot.CallbackResponse{
-			CallbackQueryID: callback.ID,
+		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+			CallbackID: callback.ID,
 			Text:            "Неизвестное действие",
 		})
 	}
@@ -215,8 +215,8 @@ func (h *CommandHandler) handleDelete(c telebot.Context, message *telebot.Messag
 	}
 
 	// Delete from both sides
-	groupChat := &telebot.ChatID{ID: h.config.SuperGroupID}
-	clientChat := &telebot.ChatID{ID: link.UserID}
+	groupChat := &telebot.Chat{ID: h.config.SuperGroupID}
+	clientChat := &telebot.Chat{ID: link.UserID}
 
 	// Delete in group (the original owner message)
 	_ = h.tgClient.Delete(groupChat, int(link.GroupMessageID))
@@ -227,15 +227,15 @@ func (h *CommandHandler) handleDelete(c telebot.Context, message *telebot.Messag
 	// Remove from database
 	_ = h.db.DeleteMessageLink(link.UserID, link.ClientMessageID)
 
-	h.logger.Printf("[INFO] "Message deleted", "user_id", link.UserID, "message_id", link.ClientMessageID)
+	h.logger.Printf("[INFO] Message deleted, user_id=%d, message_id=%d", link.UserID, link.ClientMessageID)
 
 	return nil
 }
 
 func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) error {
 	if userID == 0 {
-		h.tgClient.Answer(&telebot.CallbackResponse{
-			CallbackQueryID: c.Callback().ID,
+		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+			CallbackID: c.Callback().ID,
 			Text:            "❌ Неверный user_id",
 		})
 		return nil
@@ -243,8 +243,8 @@ func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) 
 
 	err := h.db.SetBlocked(userID, true)
 	if err != nil {
-		h.tgClient.Answer(&telebot.CallbackResponse{
-			CallbackQueryID: c.Callback().ID,
+		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+			CallbackID: c.Callback().ID,
 			Text:            fmt.Sprintf("❌ Ошибка: %v", err),
 		})
 		return nil
@@ -255,19 +255,19 @@ func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) 
 		_ = h.tgClient.CloseTopic(h.config.SuperGroupID, chat.TopicID)
 	}
 
-	h.tgClient.Answer(&telebot.CallbackResponse{
-		CallbackQueryID: c.Callback().ID,
+	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		CallbackID: c.Callback().ID,
 		Text:            fmt.Sprintf("✅ Пользователь %d заблокирован", userID),
 	})
 
-	h.logger.Printf("[INFO] "User blocked via callback"" user_id=%d", userID)
+	h.logger.Printf("[INFO] User blocked via callback, user_id=%d", userID)
 	return nil
 }
 
 func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) error {
 	if msgID == 0 {
-		h.tgClient.Answer(&telebot.CallbackResponse{
-			CallbackQueryID: c.Callback().ID,
+		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+			CallbackID: c.Callback().ID,
 			Text:            "❌ Неверный message_id",
 		})
 		return nil
@@ -280,33 +280,33 @@ func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) 
 
 	link, err := h.db.GetMessageLinkByGroupMessage(topicID, msgID)
 	if err != nil || link == nil {
-		h.tgClient.Answer(&telebot.CallbackResponse{
-			CallbackQueryID: c.Callback().ID,
+		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+			CallbackID: c.Callback().ID,
 			Text:            "❌ Сообщение не найдено",
 		})
 		return nil
 	}
 
-	groupChat := &telebot.ChatID{ID: h.config.SuperGroupID}
-	clientChat := &telebot.ChatID{ID: link.UserID}
+	groupChat := &telebot.Chat{ID: h.config.SuperGroupID}
+	clientChat := &telebot.Chat{ID: link.UserID}
 
 	_ = h.tgClient.Delete(groupChat, int(link.GroupMessageID))
 	_ = h.tgClient.Delete(clientChat, int(link.ClientMessageID))
 	_ = h.db.DeleteMessageLink(link.UserID, link.ClientMessageID)
 
-	h.tgClient.Answer(&telebot.CallbackResponse{
-		CallbackQueryID: c.Callback().ID,
+	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		CallbackID: c.Callback().ID,
 		Text:            "🗑 Удалено",
 	})
 
-	h.logger.Printf("[INFO] "Message deleted via callback", "user_id", link.UserID)
+	h.logger.Printf("[INFO] Message deleted via callback, user_id=%d", link.UserID)
 	return nil
 }
 
 func (h *CommandHandler) handleCloseTopic(c telebot.Context, topicID int64) error {
 	if topicID == 0 {
-		h.tgClient.Answer(&telebot.CallbackResponse{
-			CallbackQueryID: c.Callback().ID,
+		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+			CallbackID: c.Callback().ID,
 			Text:            "❌ Неверный topic_id",
 		})
 		return nil
@@ -314,19 +314,19 @@ func (h *CommandHandler) handleCloseTopic(c telebot.Context, topicID int64) erro
 
 	err := h.tgClient.CloseTopic(h.config.SuperGroupID, topicID)
 	if err != nil {
-		h.tgClient.Answer(&telebot.CallbackResponse{
-			CallbackQueryID: c.Callback().ID,
+		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+			CallbackID: c.Callback().ID,
 			Text:            fmt.Sprintf("❌ Ошибка: %v", err),
 		})
 		return nil
 	}
 
-	h.tgClient.Answer(&telebot.CallbackResponse{
-		CallbackQueryID: c.Callback().ID,
+	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		CallbackID: c.Callback().ID,
 		Text:            "✅ Тема закрыта",
 	})
 
-	h.logger.Printf("[INFO] "Topic closed via callback"" topic_id=%d", topicID)
+	h.logger.Printf("[INFO] Topic closed via callback, topic_id=%d", topicID)
 	return nil
 }
 
