@@ -33,3 +33,4 @@ Thumbs.db
 .next/
 dist/
 build/
+node_modules/
