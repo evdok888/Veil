@@ -38,13 +38,13 @@ func main() {
 	logger.Printf("[INFO] Database initialized: path=%s", cfg.DBPath)
 
 	settings := telebot.Settings{
-		Token:  cfg.BotToken,
-		Parser: telebot.ModeMarkdown,
+		Token:     cfg.BotToken,
+		ParseMode: telebot.ModeMarkdown,
 	}
 
 	if cfg.WebhookURL != "" {
 		settings.URL = cfg.WebhookURL
-		settings.Listen = cfg.ServerAddr
+		
 		settings.Webhook = telebot.Webhook{
 			Destination: &telebot.WebhookDestination{
 				URL: cfg.WebhookURL,

@@ -75,8 +75,8 @@ func (h *CommandHandler) HandleCallback(c telebot.Context) error {
 	if callback.Sender.ID != h.config.OwnerUserID {
 		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 			CallbackID: callback.ID,
-			Text:            "⛔️ Недоступно",
-			ShowAlert:       true,
+			Text:       "⛔️ Недоступно",
+			ShowAlert:  true,
 		})
 		return nil
 	}
@@ -91,7 +91,7 @@ func (h *CommandHandler) HandleCallback(c telebot.Context) error {
 	default:
 		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 			CallbackID: callback.ID,
-			Text:            "Неизвестное действие",
+			Text:       "Неизвестное действие",
 		})
 	}
 
@@ -102,9 +102,9 @@ func (h *CommandHandler) handleBlock(c telebot.Context, message *telebot.Message
 	var userID int64
 	var topicID int64
 
-	// Check if replying to a message
-	if message.ReplyTo != nil && message.ReplyTo.Topic != nil {
-		topicID = int64(message.ReplyTo.Topic.ID)
+	// Check if replying to a message in a topic
+	if message.ThreadID != 0 {
+		topicID = int64(message.ThreadID)
 	} else {
 		// Try to parse user ID from command args
 		if len(strings.Fields(message.Text)) > 1 {
@@ -112,7 +112,7 @@ func (h *CommandHandler) handleBlock(c telebot.Context, message *telebot.Message
 			var err error
 			userID, err = strconv.ParseInt(idStr, 10, 64)
 			if err != nil {
-				_, _ = c.Send("❌ Неверный формат user_id")
+				_ = c.Send("❌ Неверный формат user_id")
 				return nil
 			}
 		}
@@ -122,21 +122,21 @@ func (h *CommandHandler) handleBlock(c telebot.Context, message *telebot.Message
 	if topicID > 0 {
 		chat, err := h.db.GetChatByTopicID(topicID)
 		if err != nil || chat == nil {
-			_, _ = c.Send("❌ Тема не найдена в базе данных")
+			_ = c.Send("❌ Тема не найдена в базе данных")
 			return nil
 		}
 		userID = chat.UserID
 	}
 
 	if userID == 0 {
-		_, _ = c.Send("❌ Укажите user_id или ответьте командой на сообщение в теме")
+		_ = c.Send("❌ Укажите user_id или ответьте командой на сообщение в теме")
 		return nil
 	}
 
 	// Block the user
 	err := h.db.SetBlocked(userID, true)
 	if err != nil {
-		_, _ = c.Send(fmt.Sprintf("❌ Ошибка блокировки: %v", err))
+		_ = c.Send(fmt.Sprintf("❌ Ошибка блокировки: %v", err))
 		return nil
 	}
 
@@ -147,7 +147,7 @@ func (h *CommandHandler) handleBlock(c telebot.Context, message *telebot.Message
 	}
 
 	h.logger.Printf("[INFO] User blocked: user_id=%d", userID)
-	_, _ = c.Send(fmt.Sprintf("✅ Пользователь %d заблокирован. Диалог завершён.", userID))
+	_ = c.Send(fmt.Sprintf("✅ Пользователь %d заблокирован. Диалог завершён.", userID))
 
 	return nil
 }
@@ -161,20 +161,20 @@ func (h *CommandHandler) handleUnblock(c telebot.Context, message *telebot.Messa
 		var err error
 		userID, err = strconv.ParseInt(fields[1], 10, 64)
 		if err != nil {
-			_, _ = c.Send("❌ Неверный формат user_id")
+			_ = c.Send("❌ Неверный формат user_id")
 			return nil
 		}
 	}
 
 	if userID == 0 {
-		_, _ = c.Send("❌ Укажите user_id после команды /unblock")
+		_ = c.Send("❌ Укажите user_id после команды /unblock")
 		return nil
 	}
 
 	// Unblock the user
 	err := h.db.SetBlocked(userID, false)
 	if err != nil {
-		_, _ = c.Send(fmt.Sprintf("❌ Ошибка разблокировки: %v", err))
+		_ = c.Send(fmt.Sprintf("❌ Ошибка разблокировки: %v", err))
 		return nil
 	}
 
@@ -185,32 +185,29 @@ func (h *CommandHandler) handleUnblock(c telebot.Context, message *telebot.Messa
 	}
 
 	h.logger.Printf("[INFO] User unblocked: user_id=%d", userID)
-	_, _ = c.Send(fmt.Sprintf("✅ Пользователь %d разблокирован.", userID))
+	_ = c.Send(fmt.Sprintf("✅ Пользователь %d разблокирован.", userID))
 
 	return nil
 }
 
 func (h *CommandHandler) handleDelete(c telebot.Context, message *telebot.Message) error {
 	if message.ReplyTo == nil {
-		_, _ = c.Send("❌ Ответьте командой /del на сообщение для удаления")
+		_ = c.Send("❌ Ответьте командой /del на сообщение для удаления")
 		return nil
 	}
 
-	// Get topic from replied message
-	var topicID int64
-	if message.ReplyTo.Topic != nil {
-		topicID = int64(message.ReplyTo.Topic.ID)
-	}
+	// Get topic from the current message thread
+	topicID := int64(message.ThreadID)
 
 	if topicID == 0 {
-		_, _ = c.Send("❌ Сообщение должно быть в теме")
+		_ = c.Send("❌ Сообщение должно быть в теме")
 		return nil
 	}
 
 	// Find message link
 	link, err := h.db.GetMessageLinkByGroupMessage(topicID, int64(message.ReplyTo.ID))
 	if err != nil || link == nil {
-		_, _ = c.Send("❌ Сообщение не найдено в базе данных")
+		_ = c.Send("❌ Сообщение не найдено в базе данных")
 		return nil
 	}
 
@@ -236,7 +233,7 @@ func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) 
 	if userID == 0 {
 		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
-			Text:            "❌ Неверный user_id",
+			Text:       "❌ Неверный user_id",
 		})
 		return nil
 	}
@@ -245,7 +242,7 @@ func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) 
 	if err != nil {
 		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
-			Text:            fmt.Sprintf("❌ Ошибка: %v", err),
+			Text:       fmt.Sprintf("❌ Ошибка: %v", err),
 		})
 		return nil
 	}
@@ -257,7 +254,7 @@ func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) 
 
 	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 		CallbackID: c.Callback().ID,
-		Text:            fmt.Sprintf("✅ Пользователь %d заблокирован", userID),
+		Text:       fmt.Sprintf("✅ Пользователь %d заблокирован", userID),
 	})
 
 	h.logger.Printf("[INFO] User blocked via callback, user_id=%d", userID)
@@ -268,7 +265,7 @@ func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) 
 	if msgID == 0 {
 		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
-			Text:            "❌ Неверный message_id",
+			Text:       "❌ Неверный message_id",
 		})
 		return nil
 	}
@@ -276,13 +273,13 @@ func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) 
 	// For callback deletion, we need to find the message by group message ID
 	// This requires knowing the topic ID, which we can get from the message thread
 	callback := c.Callback()
-	topicID := int64(callback.Message.ReplyTo.Topic.ID)
+	topicID := int64(callback.Message.ThreadID)
 
 	link, err := h.db.GetMessageLinkByGroupMessage(topicID, msgID)
 	if err != nil || link == nil {
 		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
-			Text:            "❌ Сообщение не найдено",
+			Text:       "❌ Сообщение не найдено",
 		})
 		return nil
 	}
@@ -296,7 +293,7 @@ func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) 
 
 	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 		CallbackID: c.Callback().ID,
-		Text:            "🗑 Удалено",
+		Text:       "🗑 Удалено",
 	})
 
 	h.logger.Printf("[INFO] Message deleted via callback, user_id=%d", link.UserID)
@@ -307,7 +304,7 @@ func (h *CommandHandler) handleCloseTopic(c telebot.Context, topicID int64) erro
 	if topicID == 0 {
 		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
-			Text:            "❌ Неверный topic_id",
+			Text:       "❌ Неверный topic_id",
 		})
 		return nil
 	}
@@ -316,14 +313,14 @@ func (h *CommandHandler) handleCloseTopic(c telebot.Context, topicID int64) erro
 	if err != nil {
 		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
-			Text:            fmt.Sprintf("❌ Ошибка: %v", err),
+			Text:       fmt.Sprintf("❌ Ошибка: %v", err),
 		})
 		return nil
 	}
 
 	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
 		CallbackID: c.Callback().ID,
-		Text:            "✅ Тема закрыта",
+		Text:       "✅ Тема закрыта",
 	})
 
 	h.logger.Printf("[INFO] Topic closed via callback, topic_id=%d", topicID)
@@ -347,7 +344,7 @@ func (h *CommandHandler) handleHelp(c telebot.Context) error {
 🚫 Завершить диалог - Блокирует клиента
 🗑 Удалить - Удаляет сообщение с обеих сторон`
 
-	_, _ = c.Send(helpText, &telebot.SendOptions{
+	_ = c.Send(helpText, &telebot.SendOptions{
 		ParseMode: telebot.ModeMarkdown,
 	})
 

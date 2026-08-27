@@ -40,7 +40,7 @@ func (h *OwnerHandler) HandleMessage(c telebot.Context) error {
 	}
 
 	// Get topic ID from message thread
-	topicID := int64(message.ReplyTo.Topic.ID)
+	topicID := int64(message.ThreadID)
 	if topicID == 0 {
 		// Message not in a topic, ignore
 		return nil
@@ -96,7 +96,7 @@ func (h *OwnerHandler) HandleEditedMessage(c telebot.Context) error {
 	}
 
 	// Get topic ID from message thread
-	topicID := int64(message.ReplyTo.Topic.ID)
+	topicID := int64(message.ThreadID)
 	if topicID == 0 {
 		return nil
 	}

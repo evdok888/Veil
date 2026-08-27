@@ -223,7 +223,7 @@ func getContentType(msg *telebot.Message) string {
 	switch {
 	case msg.Text != "":
 		return "text"
-	case msg.Photo != nil && msg.Photo != nil:
+	case msg.Photo != nil:
 		return "photo"
 	case msg.Voice != nil:
 		return "voice"

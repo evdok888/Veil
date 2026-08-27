@@ -115,6 +115,30 @@ func (c *Client) DeleteMessage(chat *telebot.Chat, messageID int) error {
 	return nil
 }
 
+// Delete is an alias for DeleteMessage for compatibility
+func (c *Client) Delete(chat *telebot.Chat, messageID int) error {
+	return c.DeleteMessage(chat, messageID)
+}
+
+// NewReplyMarkup creates a new inline keyboard markup
+func (c *Client) NewReplyMarkup(rows ...telebot.Row) *telebot.ReplyMarkup {
+	markup := &telebot.ReplyMarkup{
+		InlineKeyboard: make([][]telebot.InlineButton, len(rows)),
+	}
+	for i, row := range rows {
+		markup.InlineKeyboard[i] = make([]telebot.InlineButton, len(row))
+		for j, btn := range row {
+			markup.InlineKeyboard[i][j] = telebot.InlineButton{
+				Unique: btn.Unique,
+				Text:   btn.Text,
+				Data:   btn.Data,
+				URL:    btn.URL,
+			}
+		}
+	}
+	return markup
+}
+
 // SendMessageWithInlineKeyboard sends a message with inline keyboard
 func (c *Client) SendMessageWithInlineKeyboard(chat *telebot.Chat, text string, markup *telebot.ReplyMarkup) (*telebot.Message, error) {
 	msg, err := c.Send(chat, text, &telebot.SendOptions{

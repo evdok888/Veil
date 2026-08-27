@@ -2,6 +2,10 @@
 # Compiled and build artifacts
 *.o
 *.obj
+*.exe
+*.dll
+*.so
+*.a
 *.out
 
 # Dependencies
@@ -21,18 +25,10 @@ vendor/
 .vscode/
 .idea/
 
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Build directories (Go specific)
-*.a
-*.so
-*.dylib
-*.dll
+# Go-specific
+*.test
+*.prof
 ```node_modules/
 .next/
 dist/
 build/
-node_modules/
