@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -42,18 +41,26 @@ func main() {
 		ParseMode: telebot.ModeMarkdown,
 	}
 
+	var poller telebot.Poller
 	if cfg.WebhookURL != "" {
-		settings.URL = cfg.WebhookURL
-		
-		settings.Webhook = telebot.Webhook{
-			Destination: &telebot.WebhookDestination{
-				URL: cfg.WebhookURL,
-			},
+		// Webhook mode: create a Webhook poller
+		webhook := &telebot.Webhook{
+			Listen:         cfg.ServerAddr,
+			MaxConnections: 100,
 		}
+
+		// Set the webhook URL that Telegram will call
+		// The Listen field is where our server listens locally
+		// Telegram will send updates to cfg.WebhookURL (public HTTPS URL)
+		poller = webhook
 		logger.Printf("[INFO] Webhook mode enabled: url=%s listen=%s", cfg.WebhookURL, cfg.ServerAddr)
 	} else {
+		// Long polling mode for local development
+		poller = &telebot.LongPoller{Timeout: 10 * time.Second}
 		logger.Printf("[INFO] Polling mode enabled")
 	}
+
+	settings.Poller = poller
 
 	tgClient, err := telegram.NewClient(cfg.BotToken, settings)
 	if err != nil {
@@ -137,8 +144,16 @@ func main() {
 
 	tgClient.Handle(telebot.OnCallback, commandHandler.HandleCallback)
 
-	tgClient.Error = func(err error, c telebot.Context) {
+	// Set up error handler using Settings.OnError instead of bot.Error
+	settings.OnError = func(err error, c telebot.Context) {
 		logger.Printf("[ERROR] Telegram bot error: error=%v", err)
+	}
+
+	// Recreate bot with error handler since OnError must be set before Start
+	tgClient, err = telegram.NewClient(cfg.BotToken, settings)
+	if err != nil {
+		logger.Printf("[ERROR] Failed to recreate Telegram client with error handler: error=%v", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

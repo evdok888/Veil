@@ -10,26 +10,32 @@
 
 # Dependencies
 vendor/
+node_modules/
+__pycache__/
+*.egg-info/
+.Python
+venv/
+.venv/
+.env
+.env.local
+*.env.*
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
-
-# Environment
-.env
-.env.local
-*.env.*
+*.swo
 
 # Editors
 .vscode/
 .idea/
 
-# Go-specific
-*.test
-*.prof
-```node_modules/
-.next/
-dist/
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Build directories
 build/
-node_modules/
+dist/
+target/
+```.next/
