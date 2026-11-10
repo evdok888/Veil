@@ -1,0 +1,10 @@
+.git
+.github
+.env
+*.db
+*.db-wal
+*.db-shm
+/bot
+data/
+deploy/
+*.md
