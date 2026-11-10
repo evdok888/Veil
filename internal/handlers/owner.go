@@ -3,8 +3,8 @@ package handlers
 import (
 	"fmt"
 	"log"
-	"strings"
 	"strconv"
+	"strings"
 
 	"gopkg.in/telebot.v3"
 
