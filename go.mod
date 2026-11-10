@@ -1,6 +1,6 @@
 module telegram-relay-bot
 
-go 1.19
+go 1.26.10
 
 require (
 	github.com/joho/godotenv v1.5.1

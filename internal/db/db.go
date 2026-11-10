@@ -43,14 +43,14 @@ func New(dbPath string) (*DB, error) {
 	// Enable foreign keys
 	_, err = conn.Exec("PRAGMA foreign_keys = ON")
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
 
 	db := &DB{conn: conn}
 
 	if err := db.migrate(); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 

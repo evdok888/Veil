@@ -75,7 +75,7 @@ func (h *CommandHandler) HandleCallback(c telebot.Context) error {
 
 	// Verify owner
 	if callback.Sender.ID != h.config.OwnerUserID {
-		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		h.respond(c, &telebot.CallbackResponse{
 			CallbackID: callback.ID,
 			Text:       "⛔️ Недоступно",
 			ShowAlert:  true,
@@ -91,7 +91,7 @@ func (h *CommandHandler) HandleCallback(c telebot.Context) error {
 	case "close_topic":
 		return h.handleCloseTopic(c, targetID)
 	default:
-		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		h.respond(c, &telebot.CallbackResponse{
 			CallbackID: callback.ID,
 			Text:       "Неизвестное действие",
 		})
@@ -282,7 +282,7 @@ func (h *CommandHandler) handleDelete(c telebot.Context, message *telebot.Messag
 
 func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) error {
 	if userID == 0 {
-		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		h.respond(c, &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
 			Text:       "❌ Неверный user_id",
 		})
@@ -291,7 +291,7 @@ func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) 
 
 	err := h.db.SetBlocked(userID, true)
 	if err != nil {
-		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		h.respond(c, &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
 			Text:       fmt.Sprintf("❌ Ошибка: %v", err),
 		})
@@ -303,7 +303,7 @@ func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) 
 		_ = h.tgClient.CloseTopic(h.config.SuperGroupID, chat.TopicID)
 	}
 
-	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+	h.respond(c, &telebot.CallbackResponse{
 		CallbackID: c.Callback().ID,
 		Text:       fmt.Sprintf("✅ Пользователь %d заблокирован", userID),
 	})
@@ -314,7 +314,7 @@ func (h *CommandHandler) handleBlockByCallback(c telebot.Context, userID int64) 
 
 func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) error {
 	if msgID == 0 {
-		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		h.respond(c, &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
 			Text:       "❌ Неверный message_id",
 		})
@@ -328,7 +328,7 @@ func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) 
 
 	link, err := h.db.GetMessageLinkByGroupMessage(topicID, msgID)
 	if err != nil || link == nil {
-		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		h.respond(c, &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
 			Text:       "❌ Сообщение не найдено",
 		})
@@ -342,7 +342,7 @@ func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) 
 	_ = h.tgClient.Delete(clientChat, int(link.ClientMessageID))
 	_ = h.db.DeleteMessageLink(link.UserID, link.ClientMessageID)
 
-	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+	h.respond(c, &telebot.CallbackResponse{
 		CallbackID: c.Callback().ID,
 		Text:       "🗑 Удалено",
 	})
@@ -353,7 +353,7 @@ func (h *CommandHandler) handleDeleteByCallback(c telebot.Context, msgID int64) 
 
 func (h *CommandHandler) handleCloseTopic(c telebot.Context, topicID int64) error {
 	if topicID == 0 {
-		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		h.respond(c, &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
 			Text:       "❌ Неверный topic_id",
 		})
@@ -362,14 +362,14 @@ func (h *CommandHandler) handleCloseTopic(c telebot.Context, topicID int64) erro
 
 	err := h.tgClient.CloseTopic(h.config.SuperGroupID, topicID)
 	if err != nil {
-		h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+		h.respond(c, &telebot.CallbackResponse{
 			CallbackID: c.Callback().ID,
 			Text:       fmt.Sprintf("❌ Ошибка: %v", err),
 		})
 		return nil
 	}
 
-	h.tgClient.Respond(c.Callback(), &telebot.CallbackResponse{
+	h.respond(c, &telebot.CallbackResponse{
 		CallbackID: c.Callback().ID,
 		Text:       "✅ Тема закрыта",
 	})
@@ -425,4 +425,11 @@ func (h *CommandHandler) CreateInlineKeyboardForMessage(userID int64, groupMsgID
 			},
 		},
 	)
+}
+
+// respond отвечает на callback и логирует ошибку, а не теряет её.
+func (h *CommandHandler) respond(c telebot.Context, resp *telebot.CallbackResponse) {
+	if err := h.tgClient.Respond(c.Callback(), resp); err != nil {
+		log.Printf("callback respond failed: %v", err)
+	}
 }
