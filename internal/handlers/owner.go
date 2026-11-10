@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"strconv"
 
 	"gopkg.in/telebot.v3"
 
@@ -153,13 +154,11 @@ func (h *OwnerHandler) isValidOwnerMessage(c telebot.Context) bool {
 
 // Helper to extract inline query data for callback handling
 func ExtractCallbackData(callback string) (action string, targetID int64) {
-	parts := strings.SplitN(callback, ":", 2)
-	if len(parts) < 1 {
-		return "", 0
-	}
-	action = parts[0]
-	if len(parts) > 1 {
-		fmt.Sscanf(parts[1], "%d", &targetID)
+	action, rest, found := strings.Cut(callback, ":")
+	if found {
+		if n, err := strconv.ParseInt(rest, 10, 64); err == nil {
+			targetID = n
+		}
 	}
 	return action, targetID
 }
